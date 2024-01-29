@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Product Configurator</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    
+    <script>
+       let selectedKeyword = 'conveyor';
+
+       function selectItem(item) {
+            item.classList.toggle('selected');
+            updateConfiguration();
+        }
+
+        function updateConfiguration() {
+
+            const selectedItems = document.querySelectorAll('.selectable.selected');
+            const configDiv = document.getElementById('configuration');
+            const configTitle = document.getElementById('configuration-title');
+            configTitle.textContent = `Configuration for "${selectedKeyword}"`;
+            configDiv.innerHTML = '';
+            selectedItems.forEach((item, index) => {
+                let text = item.getAttribute('data-original-text');
+                const selectedSize = item.querySelector('select') ? item.querySelector('select').value : '';
+                if (selectedSize && selectedSize !== 'default') {
+                    text = text.replace('[...]', selectedSize);
+                }
+                configDiv.innerHTML += `<div class="configuration-item">${index + 1} - ${text}</div>`;
+            });
+            }
+
+
+            function selectSize(event, item) {
+            event.stopPropagation();
+            updateConfiguration();
+            }
+
+
+            function completeConfiguration() {
+                const configDiv = document.getElementById('configuration');
+                if (!selectedKeyword || configDiv.innerHTML.trim() === '' || !projectNumber) {
+                    alert('Please enter a project number, select a machine, and configure items before completing.');
+                    return;
+                }
+                const configCount = configurations.filter(config => config.keyword === selectedKeyword).length + 1;
+                const completedConfig = {
+                    keyword: selectedKeyword,
+                    items: configDiv.innerHTML,
+                    projectNumber: projectNumber,
+                    configCount: configCount // Item count for this keyword
+                };
+                configurations.push(completedConfig);
+
+                configDiv.innerHTML = '';
+                updateConfigurationTitle();
+                resetSelections();
+                updateAccordion();
+            }
+
+
+        
+
+        function fetchConfigurationItems(keyword) {
+    fetch('/fetch_configuration_items', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({keyword: keyword})
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return response.json();
+    })
+    .then(data => {
+        console.log("Received data:", data); // For debugging
+        displayConfigurationItems(data.items);
+    })
+    .catch(error => console.error('Error fetching configuration items:', error));
+}
+
+
+        // Function to handle card-based machine selection
+        function selectMachine(keyword, element) {
+    selectedKeyword = keyword; // Update the selectedKeyword
+    document.querySelectorAll('.card').forEach(card => card.classList.remove('selected'));
+    element.classList.add('selected');
+    fetchConfigurationItems(keyword);
+}
+
+
+    let configurations = []; // Array to store completed configurations
+    
+
+function displayConfigurationItems(items) {
+    const resultsDiv = document.querySelector('.results');
+    resultsDiv.innerHTML = '';
+    items.forEach((item, index) => {
+        // Create the configuration item element
+        const resultItem = document.createElement('div');
+        resultItem.className = 'selectable result-item';
+        resultItem.setAttribute('data-original-text', item);
+        resultItem.innerHTML = `<span class="line-text">${item}</span>`;
+
+        // Add a select dropdown for sizes if the line has a placeholder
+        if (item.includes('[...]')) {
+            const selectHtml = `
+                <select onchange="selectSize(event, this.parentElement)">
+                    <option value="default">Select Size</option>
+                    <option value="100mm">100mm</option>
+                    <option value="200mm">200mm</option>
+                    <option value="300mm">300mm</option>
+                </select>`;
+            resultItem.innerHTML += selectHtml;
+        }
+
+        // Add count information
+        resultItem.innerHTML += `
+            <div class="count-info">(Count: 1/${items.length} - ${(1 / items.length * 100).toFixed(2)}%)</div>`;
+
+        // Append the item to the results div
+        resultsDiv.appendChild(resultItem);
+
+        // Add event listener for selecting items
+        resultItem.addEventListener('click', function() {
+            selectItem(resultItem);
+        });
+    });
+}
+
+
+
+    function clearConfigurationSelections() {
+    const selectedItems = document.querySelectorAll('.selectable.selected');
+    selectedItems.forEach(item => item.classList.remove('selected'));
+}
+
+    // Updated completeConfiguration function
+
+
+function resetSelections() {
+    // Deselect all cards
+    document.querySelectorAll('.card').forEach(card => card.classList.remove('selected'));
+    // Clear selected items in the results area
+    document.querySelectorAll('.selectable.selected').forEach(item => item.classList.remove('selected'));
+    // Reset the keyword dropdown (if used)
+    const keywordSelect = document.getElementById('keyword');
+    if (keywordSelect) {
+        keywordSelect.selectedIndex = 0;
+    }
+}
+
+function updateConfiguration() {
+    const selectedItems = document.querySelectorAll('.selectable.selected');
+    const configDiv = document.getElementById('configuration');
+    const configTitle = document.getElementById('configuration-title');
+
+    // Check if configTitle element exists
+    if (configTitle) {
+        configTitle.textContent = `Configuration for "${selectedKeyword}"`;
+    }
+
+    configDiv.innerHTML = '';
+    selectedItems.forEach((item, index) => {
+        let text = item.getAttribute('data-original-text');
+        const selectedSize = item.querySelector('select') ? item.querySelector('select').value : '';
+        if (selectedSize && selectedSize !== 'default') {
+            text = text.replace('[...]', selectedSize);
+        }
+        configDiv.innerHTML += `<div class="configuration-item">${index + 1} - ${text}</div>`;
+    });
+}
+
+
+
+
+
+function updateConfigurationTitle() {
+    const configTitle = document.getElementById('selected-configuration-title');
+    configTitle.textContent = selectedKeyword ? `Selected Configuration for "${selectedKeyword}"` : 'Selected Configuration';
+}
+
+
+    // Updated updateAccordion function
+    function updateAccordion() {
+    const accordionDiv = document.getElementById('accordion');
+    accordionDiv.innerHTML = '';
+    configurations.forEach((config, index) => {
+        // Format the accordion title with project number, keyword, and configuration count
+        const accordionTitle = `${config.projectNumber}-${config.keyword}-${String(config.configCount).padStart(3, '0')} `;
+
+        accordionDiv.innerHTML += `
+            <div class="accordion-item">
+                <div class="accordion-header" onclick="toggleAccordion(${index})">
+                    ${accordionTitle}
+                </div>
+                <div class="accordion-content" style="display: none;">
+                    ${config.items}
+                </div>
+            </div>`;
+    });
+}
+
+
+    function toggleAccordion(index) {
+        const accordionItem = document.querySelectorAll('.accordion-content')[index];
+        accordionItem.style.display = accordionItem.style.display === 'none' ? 'block' : 'none';
+    }
+    let projectNumber = ''; // Variable to store the project number
+
+    function handleProjectNumberChange(event) {
+                projectNumber = event.target.value;
+            }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        
+            // Function to handle changes in the project number input
+            document.getElementById('project-number-input').addEventListener('change', handleProjectNumberChange);
+        
+    });
+
+    
+    </script>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo" style="height: 60px; vertical-align: middle;">
+            <h1 style="display: inline; margin-left: 15px;">Line Configurator</h1>
+        </div>
+    </header>
+
+    <div class="container project-number-container">
+        <label for="project-number-input">Project Number:</label>
+        <input type="text" id="project-number-input" placeholder="Enter project number">
+    </div>
+
+    <!-- Card elements for machine selection -->
+    <div class="container card-container">
+        {% for keyword in keywords %}
+        <div class="card" onclick="selectMachine('{{ keyword }}', this)" data-keyword="{{ keyword }}">
+            <img src="{{ url_for('static', filename=keyword + '.png') }}" alt="{{ keyword }}" class="card-image">
+            <div class="card-title">{{ keyword }}</div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <div class="container split-screen">
+        <div class="left-side">
+            <form method="POST">
+                <label for="keyword">Select Keyword:</label>
+                <select name="keyword" id="keyword" style="display: none;">
+                    {% for keyword in keywords %}
+                    <option value="{{ keyword }}" {% if selected_keyword == keyword %}selected{% endif %}>{{ keyword }}</option>
+                    {% endfor %}
+                </select>
+                <input type="submit" value="Analyze" style="display: none;">
+            </form>
+
+            <div class="results">
+                <h2 id="configuration-title">Configuration for "{{ selected_keyword }}"</h2>
+                {% for line, count in common_lines %}
+                <div class="selectable result-item" onclick="selectItem(this)" data-original-text="{{ line }}">
+                    <span class="line-text">{{ line }}</span>
+                    {% if '[...]' in line %}
+                    <select onchange="selectSize(event, this.parentElement)">
+                        <option value="default">Select Size</option>
+                        <option value="100mm">100mm</option>
+                        <option value="200mm">200mm</option>
+                        <option value="300mm">300mm</option>
+                    </select>
+                    {% endif %}
+                    <div class="count-info">
+                        (Count: {{ count }}/{{ keyword_lines_count }} - {{ (count / keyword_lines_count * 100) | round(2) }}%)
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        <div class="right-side">
+            <h2 id="selected-configuration-title">Selected Configuration</h2>
+            <div id="configuration" class="configuration">
+                <!-- Configuration items will be displayed here -->
+            </div>
+            <button onclick="completeConfiguration()" class="complete-item-btn">Complete Item</button>
+
+            <!-- Accordion for completed configurations -->
+        <div id="accordion" class="accordion">
+            <!-- Completed configurations will be displayed here -->
+        </div>
+        </div>
+    
+        
+    </div>
+</body>
+</html>
